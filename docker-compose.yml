@@ -1,0 +1,103 @@
+version: '3.8'
+
+volumes:
+  prometheus_data:
+  grafana_data:
+networks:
+  front-tier:
+  back-tier:
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command: 
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - 9090:9090
+    networks:
+      - back-tier
+    restart: always
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    env_file:
+      - grafana/grafana.env
+      - grafana/grafana_secret.env
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: always
+    networks:
+      - back-tier
+      - front-tier
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager:/etc/alertmanager
+    command: "--config.file=/etc/alertmanager/config.yaml"
+    ports:
+      - 9093:9093
+    restart: always
+    networks:
+      - back-tier
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command: 
+      - '--path.procfs=/host/proc' 
+      - '--path.sysfs=/host/sys'
+      - --collector.filesystem.ignored-mount-points
+      - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+    ports:
+      - 9100:9100
+    networks:
+      - back-tier
+    restart: always
+    deploy:
+      mode: global
+  iot_exporter:
+    build: ./iot-exporter
+    container_name: iot-exporter
+    restart: always
+    ports:
+      - "9081:9081"
+    networks:
+      - back-tier
+    devices:
+      - "/dev/serial0:/dev/serial0"
+      - "/dev/ttyS0:/dev/ttyS0"
+      - "/dev/ttyAMA0:/dev/ttyAMA0"
+      - "/dev/i2c-1:/dev/i2c-1"
+  external_api_exporter:
+    build: ./external-api-exporter
+    container_name: external-api-exporter
+    restart: always
+    ports:
+      - "9082:9082"
+    networks:
+      - back-tier
+  openweather_exporter:
+    build: ./openweather-exporter
+    container_name: openweather-exporter
+    restart: always
+    ports:
+      - "9091:9091"
+    networks:
+      - back-tier
+    environment:
+      - OW_CITY=Shinagawa-ku
+      - OW_APIKEY=d9d512ac2f71453e5728ffbd301b3a76
+      - OW_DEGREES_UNIT=C

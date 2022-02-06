@@ -1,0 +1,3 @@
+[submodule "openweather-exporter"]
+	path = openweather-exporter
+	url = https://github.com/billykwooten/openweather-exporter.git
